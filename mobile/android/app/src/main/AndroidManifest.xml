@@ -11,8 +11,21 @@
         android:icon="@drawable/ic_launcher_v110"
         android:roundIcon="@drawable/ic_launcher_v110"
         android:hardwareAccelerated="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
+
         <activity
             android:name=".MobileActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
+
+        <activity
+            android:name=".SafeMobileActivity"
             android:exported="true"
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode">
