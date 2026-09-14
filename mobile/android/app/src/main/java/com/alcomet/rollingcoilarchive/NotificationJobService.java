@@ -11,6 +11,7 @@ import java.util.*;
 
 public class NotificationJobService extends JobService {
     private static final int JOB_ID=15021;
+    private static final int TEST_ID=15022;
     private static final String CHANNEL="coil_watch_v150";
 
     static void configure(Context c,MobileFeatureClient.Policy p){
@@ -24,6 +25,24 @@ public class NotificationJobService extends JobService {
             .setPeriodic(interval)
             .build();
         js.schedule(job);
+    }
+
+    static boolean showTestNotification(Context c){
+        if(c==null)return false;
+        if(Build.VERSION.SDK_INT>=33&&c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return false;
+        NotificationManager nm=(NotificationManager)c.getSystemService(NOTIFICATION_SERVICE);
+        if(nm==null)return false;
+        if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CHANNEL,"Coil Watchlist",NotificationManager.IMPORTANCE_DEFAULT));
+        Intent open=new Intent(c,SafeMobileActivity.class).putExtra("open_path","/").addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent pi=PendingIntent.getActivity(c,TEST_ID,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(c,CHANNEL):new Notification.Builder(c);
+        b.setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("CoilReport notification test")
+            .setContentText("Android Watchlist notifications are working.")
+            .setAutoCancel(true)
+            .setContentIntent(pi);
+        nm.notify(TEST_ID,b.build());
+        return true;
     }
 
     @Override public boolean onStartJob(JobParameters params){
@@ -48,8 +67,6 @@ public class NotificationJobService extends JobService {
             JSONObject e=a.optJSONObject(i);if(e==null)continue;
             String id=e.optString("id"),coil=e.optString("coil"),fam=e.optString("family"),machine=e.optString("machine");
             if(id.isEmpty()||MobileWatchStore.wasNotified(this,id)||!MobileWatchStore.matches(w,coil,fam,p.childSuffixes))continue;
-            // Do not consume an event while Android notification permission is missing.
-            // It will be eligible again after permission is granted.
             if(!permissionReady)continue;
             String prev=e.optString("previous_machine");
             String type=e.optString("type");
@@ -57,8 +74,6 @@ public class NotificationJobService extends JobService {
             String text=(p.journeyNotifications&&"handoff".equals(type)&&!prev.isEmpty())?prev+" → "+machine:"Detected at "+machine;
             if(notifyEvent(id,title,text,e.optString("report_url","/")))MobileWatchStore.markNotified(this,id);
         }
-        // Advance the poll cursor only when notifications can actually be delivered.
-        // Otherwise watched events remain recoverable after the user grants permission.
         if(permissionReady)MobileWatchStore.setLastPoll(this,now);
     }
 
