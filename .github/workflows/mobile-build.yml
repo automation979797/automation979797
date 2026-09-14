@@ -1,0 +1,79 @@
+name: Build Alcomet Mobile Apps
+
+on:
+  push:
+    branches: [ mobile-build ]
+    paths:
+      - 'ci/alcomet-mobile-ci-text.b64'
+      - '.github/workflows/mobile-build.yml'
+  workflow_dispatch:
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore source
+        run: |
+          base64 -d ci/alcomet-mobile-ci-text.b64 > mobile.zip
+          unzip -q mobile.zip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Ensure Android SDK 35
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ -x "$SDKMANAGER" ]; then
+            yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+            "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
+          fi
+      - name: Build installable debug APK
+        working-directory: alcomet_mobile_ci_text/android
+        run: gradle --no-daemon clean assembleDebug
+      - name: Rename APK
+        run: cp alcomet_mobile_ci_text/android/app/build/outputs/apk/debug/app-debug.apk Alcomet_Rolling_Shop_Coil_Archive_Android_v1.0.0.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Alcomet-Rolling-Shop-Coil-Archive-Android-APK
+          path: Alcomet_Rolling_Shop_Coil_Archive_Android_v1.0.0.apk
+          if-no-files-found: error
+
+  ios:
+    name: iOS unsigned IPA
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore source
+        run: |
+          base64 -d ci/alcomet-mobile-ci-text.b64 > mobile.zip
+          unzip -q mobile.zip
+      - name: Build arm64 iPhone app without signing
+        run: |
+          mkdir -p build/ios
+          xcodebuild \
+            -project alcomet_mobile_ci_text/ios/AlcometCoilArchive.xcodeproj \
+            -target AlcometCoilArchive \
+            -sdk iphoneos \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CONFIGURATION_BUILD_DIR="$PWD/build/ios" \
+            build
+      - name: Package unsigned IPA
+        run: |
+          APP=$(find build/ios -maxdepth 1 -type d -name '*.app' -print -quit)
+          test -n "$APP"
+          rm -rf Payload
+          mkdir Payload
+          cp -R "$APP" Payload/
+          /usr/bin/zip -qry Alcomet_Rolling_Shop_Coil_Archive_iOS_v1.0.0_unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Alcomet-Rolling-Shop-Coil-Archive-iOS-Unsigned-IPA
+          path: Alcomet_Rolling_Shop_Coil_Archive_iOS_v1.0.0_unsigned.ipa
+          if-no-files-found: error
