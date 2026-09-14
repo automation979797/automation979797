@@ -6,11 +6,47 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 final class MobileWatchStore {
-    private static final String PREF="mobile_watch_v150",KEY="coils",LAST="last_poll",NOTIFIED="notified";
+    private static final String PREF="mobile_watch_v150",KEY="coils",LAST="last_poll",NOTIFIED="notified",MUTED="muted";
     private static final Pattern SAFE=Pattern.compile("^[A-Z0-9._-]{2,64}$");
+
     static Set<String> getWatches(Context c){return new TreeSet<>(c.getSharedPreferences(PREF,0).getStringSet(KEY,Collections.emptySet()));}
-    static void addWatch(Context c,String coil){coil=normalizeCoil(coil);if(coil.isEmpty())return;Set<String>s=getWatches(c);s.add(coil);c.getSharedPreferences(PREF,0).edit().putStringSet(KEY,s).apply();}
-    static void removeWatch(Context c,String coil){Set<String>s=getWatches(c);s.remove(normalizeCoil(coil));c.getSharedPreferences(PREF,0).edit().putStringSet(KEY,s).apply();}
+
+    static Set<String> getNotificationWatches(Context c){
+        Set<String> s=getWatches(c);
+        Set<String> muted=new HashSet<>(c.getSharedPreferences(PREF,0).getStringSet(MUTED,Collections.emptySet()));
+        s.removeAll(muted);
+        return s;
+    }
+
+    static void addWatch(Context c,String coil){
+        coil=normalizeCoil(coil);if(coil.isEmpty())return;
+        Set<String>s=getWatches(c);s.add(coil);
+        c.getSharedPreferences(PREF,0).edit().putStringSet(KEY,s).apply();
+    }
+
+    static void removeWatch(Context c,String coil){
+        coil=normalizeCoil(coil);
+        Set<String>s=getWatches(c);s.remove(coil);
+        Set<String>m=new HashSet<>(c.getSharedPreferences(PREF,0).getStringSet(MUTED,Collections.emptySet()));m.remove(coil);
+        c.getSharedPreferences(PREF,0).edit().putStringSet(KEY,s).putStringSet(MUTED,m).apply();
+    }
+
+    static void clearWatches(Context c){
+        c.getSharedPreferences(PREF,0).edit().remove(KEY).remove(MUTED).apply();
+    }
+
+    static boolean isMuted(Context c,String coil){
+        coil=normalizeCoil(coil);
+        return c.getSharedPreferences(PREF,0).getStringSet(MUTED,Collections.emptySet()).contains(coil);
+    }
+
+    static void setMuted(Context c,String coil,boolean muted){
+        coil=normalizeCoil(coil);if(coil.isEmpty())return;
+        Set<String>m=new HashSet<>(c.getSharedPreferences(PREF,0).getStringSet(MUTED,Collections.emptySet()));
+        if(muted)m.add(coil);else m.remove(coil);
+        c.getSharedPreferences(PREF,0).edit().putStringSet(MUTED,m).apply();
+    }
+
     static String normalizeCoil(String v){if(v==null)return"";v=v.trim().toUpperCase(Locale.ROOT);return SAFE.matcher(v).matches()?v:"";}
     static long lastPoll(Context c){return c.getSharedPreferences(PREF,0).getLong(LAST,0);}
     static void setLastPoll(Context c,long v){c.getSharedPreferences(PREF,0).edit().putLong(LAST,v).apply();}
