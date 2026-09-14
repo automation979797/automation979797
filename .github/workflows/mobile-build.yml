@@ -68,21 +68,41 @@ jobs:
           test -s "$STOREPASS"
           test -s "$KEYPASS"
 
-      - name: Apply Android v1.4.2 reliability and toolbar patches
+      - name: Validate and apply Android v1.5.0 patches
         run: |
+          set -euo pipefail
+          python3 -m py_compile mobile/android/patch_v140.py mobile/android/patch_v141.py mobile/android/patch_v142.py mobile/android/patch_v150.py
           python3 mobile/android/patch_v140.py
           python3 mobile/android/patch_v141.py
           python3 mobile/android/patch_v142.py
-          grep -q 'APP_VERSION = "1.4.2"' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
-          grep -q 'FILE_READ_TIMEOUT_MS = 180000' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
-          grep -q 'requestReferer' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
-          grep -q 'requestCookie' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
-          grep -q 'ic_nav_home_v142' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
-          grep -q 'ic_nav_download_v142' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
-          grep -q 'ic_nav_tune_v142' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
-          ! grep -A75 'private void saveHttpDownload' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java | grep -q 'web.getUrl()'
-          grep -q "versionCode 17" mobile/android/app/build.gradle
-          grep -q "versionName '1.4.2'" mobile/android/app/build.gradle
+          python3 mobile/android/patch_v150.py
+          SRC=mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
+          grep -q 'APP_VERSION = "1.5.0"' "$SRC"
+          grep -q 'FILE_READ_TIMEOUT_MS = 180000' "$SRC"
+          grep -q 'requestReferer' "$SRC"
+          grep -q 'requestCookie' "$SRC"
+          grep -q 'ic_nav_home_v142' "$SRC"
+          grep -q 'ic_nav_download_v142' "$SRC"
+          grep -q 'ic_scan_v150' "$SRC"
+          grep -q 'ic_watch_v150' "$SRC"
+          grep -q 'mobilePolicy.qrBarcodeSearch' "$SRC"
+          grep -q 'mobilePolicy.watchlist' "$SRC"
+          grep -q 'setVisibility(View.GONE)' "$SRC"
+          grep -q 'mobile-capabilities.json' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileFeatureClient.java
+          grep -q 'js.cancel(JOB_ID)' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/NotificationJobService.java
+          grep -q 'BarcodeFormat.QR_CODE' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/BarcodeScannerActivity.java
+          grep -q 'BarcodeFormat.CODE_128' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/BarcodeScannerActivity.java
+          grep -q 'BarcodeFormat.DATA_MATRIX' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/BarcodeScannerActivity.java
+          ! grep -Rqi 'firebase\|fcm.googleapis\|onesignal' mobile/android/app/src/main/java
+          ! grep -A75 'private void saveHttpDownload' "$SRC" | grep -q 'web.getUrl()'
+          grep -q 'port==5050' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MainActivity.java
+          grep -q 'h.cancel()' "$SRC"
+          grep -q "versionCode 18" mobile/android/app/build.gradle
+          grep -q "versionName '1.5.0'" mobile/android/app/build.gradle
+          grep -q "com.google.zxing:core:3.5.3" mobile/android/app/build.gradle
+          grep -q 'android.permission.CAMERA' mobile/android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.POST_NOTIFICATIONS' mobile/android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.RECEIVE_BOOT_COMPLETED' mobile/android/app/src/main/AndroidManifest.xml
 
       - name: Build unsigned production APK
         working-directory: mobile/android
@@ -94,7 +114,7 @@ jobs:
           set -euo pipefail
           BT="$ANDROID_HOME/build-tools/35.0.0"
           UNSIGNED="mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk"
-          OUT="Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.2.apk"
+          OUT="Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.0.apk"
           test -s "$UNSIGNED"
           "$BT/apksigner" sign \
             --ks "$HOME/.alcomet-signing/alcomet-release.jks" \
@@ -105,24 +125,27 @@ jobs:
             "$UNSIGNED"
           "$BT/apksigner" verify --verbose --print-certs "$OUT"
           "$BT/aapt" dump badging "$OUT" | tee apk-badging.txt
+          "$BT/aapt" dump permissions "$OUT" | tee apk-permissions.txt
           grep -q "package: name='com.alcomet.rollingcoilarchive'" apk-badging.txt
-          grep -q "versionCode='17' versionName='1.4.2'" apk-badging.txt
+          grep -q "versionCode='18' versionName='1.5.0'" apk-badging.txt
           grep -q "launchable-activity: name='com.alcomet.rollingcoilarchive.SafeMobileActivity'" apk-badging.txt
-          sha256sum "$OUT" > Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.2_SHA256.txt
+          grep -q 'android.permission.CAMERA' apk-permissions.txt
+          grep -q 'android.permission.POST_NOTIFICATIONS' apk-permissions.txt
+          sha256sum "$OUT" > Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.0_SHA256.txt
 
       - name: Upload production APK
         uses: actions/upload-artifact@v4
         with:
-          name: Alcomet-Rolling-Shop-Coil-Archive-Android-v1.4.2-Production
+          name: Alcomet-Rolling-Shop-Coil-Archive-Android-v1.5.0-Production
           path: |
-            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.2.apk
-            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.2_SHA256.txt
+            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.0.apk
+            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.0_SHA256.txt
             apk-badging.txt
+            apk-permissions.txt
           if-no-files-found: error
 
-      - name: Runtime launch smoke test on Android 15
-        continue-on-error: true
-        timeout-minutes: 6
+      - name: Required Android 15 runtime launch smoke test
+        timeout-minutes: 8
         shell: bash
         run: |
           set -euo pipefail
@@ -136,30 +159,38 @@ jobs:
           echo no | "$AVDMANAGER" create avd --force -n alcometSmoke -k 'system-images;android-35;google_apis;x86_64'
           "$EMULATOR" -avd alcometSmoke -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data -gpu swiftshader_indirect > emulator.log 2>&1 &
           "$ADB" wait-for-device
-          for i in $(seq 1 60); do
+          for i in $(seq 1 80); do
             BOOT="$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
             if [ "$BOOT" = "1" ]; then break; fi
             sleep 3
           done
           test "$("$ADB" shell getprop sys.boot_completed | tr -d '\r')" = "1"
-          "$ADB" install -r Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.2.apk
+          "$ADB" install -r Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.0.apk
           "$ADB" logcat -c
           "$ADB" shell am start -W -n com.alcomet.rollingcoilarchive/com.alcomet.rollingcoilarchive.SafeMobileActivity | tee android15-launch.txt
           sleep 4
           PID="$("$ADB" shell pidof com.alcomet.rollingcoilarchive | tr -d '\r' || true)"
           test -n "$PID"
+          "$ADB" shell dumpsys package com.alcomet.rollingcoilarchive > package-dump.txt
+          grep -q 'BarcodeScannerActivity' package-dump.txt
+          grep -q 'NotificationJobService' package-dump.txt
+          if "$ADB" logcat -d | grep -E 'FATAL EXCEPTION|AndroidRuntime:.*Process: com.alcomet.rollingcoilarchive'; then
+            echo 'Fatal Android runtime error detected' >&2
+            exit 1
+          fi
           "$ADB" exec-out screencap -p > android15-launch.png
-          echo "Runtime smoke test PASS; pid=$PID"
+          echo "Required runtime smoke test PASS; pid=$PID"
 
-      - name: Upload optional Android 15 smoke diagnostics
+      - name: Upload Android 15 smoke diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Alcomet-Android-v1.4.2-Smoke-Diagnostics
+          name: Alcomet-Android-v1.5.0-Smoke-Diagnostics
           path: |
             android15-launch.txt
             android15-launch.png
             emulator.log
+            package-dump.txt
           if-no-files-found: ignore
 
   ios:
