@@ -20,8 +20,12 @@ final class MobileWatchStore {
 
     static void addWatch(Context c,String coil){
         coil=normalizeCoil(coil);if(coil.isEmpty())return;
-        Set<String>s=getWatches(c);s.add(coil);
-        c.getSharedPreferences(PREF,0).edit().putStringSet(KEY,s).apply();
+        Set<String>s=getWatches(c);
+        boolean wasEmpty=s.isEmpty();
+        s.add(coil);
+        SharedPreferences.Editor e=c.getSharedPreferences(PREF,0).edit().putStringSet(KEY,s);
+        if(wasEmpty)e.putLong(LAST,System.currentTimeMillis()/1000L);
+        e.apply();
     }
 
     static void removeWatch(Context c,String coil){
@@ -32,7 +36,7 @@ final class MobileWatchStore {
     }
 
     static void clearWatches(Context c){
-        c.getSharedPreferences(PREF,0).edit().remove(KEY).remove(MUTED).apply();
+        c.getSharedPreferences(PREF,0).edit().remove(KEY).remove(MUTED).putLong(LAST,System.currentTimeMillis()/1000L).apply();
     }
 
     static boolean isMuted(Context c,String coil){
