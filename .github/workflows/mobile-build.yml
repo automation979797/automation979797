@@ -104,9 +104,13 @@ jobs:
           set -euo pipefail
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+          ADB="$ANDROID_HOME/platform-tools/adb"
+          EMULATOR="$ANDROID_HOME/emulator/emulator"
           "$SDKMANAGER" 'emulator' 'system-images;android-35;google_apis;x86_64'
+          test -x "$ADB"
+          test -x "$EMULATOR"
           echo no | "$AVDMANAGER" create avd --force -n alcometSmoke -k 'system-images;android-35;google_apis;x86_64'
-          "$ANDROID_HOME/emulator/emulator" \
+          "$EMULATOR" \
             -avd alcometSmoke \
             -no-window \
             -no-audio \
@@ -115,26 +119,26 @@ jobs:
             -wipe-data \
             -gpu swiftshader_indirect \
             > emulator.log 2>&1 &
-          adb wait-for-device
+          "$ADB" wait-for-device
           for i in $(seq 1 80); do
-            BOOT="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+            BOOT="$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
             if [ "$BOOT" = "1" ]; then break; fi
             sleep 3
           done
-          test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1"
-          adb install -r Alcomet_Rolling_Shop_Coil_Archive_Android_v1.3.1.apk
-          adb logcat -c
-          adb shell am start -W -n com.alcomet.rollingcoilarchive/com.alcomet.rollingcoilarchive.SafeMobileActivity | tee android15-launch.txt
+          test "$("$ADB" shell getprop sys.boot_completed | tr -d '\r')" = "1"
+          "$ADB" install -r Alcomet_Rolling_Shop_Coil_Archive_Android_v1.3.1.apk
+          "$ADB" logcat -c
+          "$ADB" shell am start -W -n com.alcomet.rollingcoilarchive/com.alcomet.rollingcoilarchive.SafeMobileActivity | tee android15-launch.txt
           sleep 4
-          PID="$(adb shell pidof com.alcomet.rollingcoilarchive | tr -d '\r' || true)"
+          PID="$("$ADB" shell pidof com.alcomet.rollingcoilarchive | tr -d '\r' || true)"
           if [ -z "$PID" ]; then
             echo 'Alcomet process did not remain alive after launch.'
-            adb logcat -d | tail -400 > android15-logcat.txt
+            "$ADB" logcat -d | tail -400 > android15-logcat.txt
             cat android15-logcat.txt
             exit 1
           fi
-          adb exec-out screencap -p > android15-launch.png
-          adb shell dumpsys activity activities > android15-activities.txt
+          "$ADB" exec-out screencap -p > android15-launch.png
+          "$ADB" shell dumpsys activity activities > android15-activities.txt
           grep -q 'com.alcomet.rollingcoilarchive' android15-activities.txt
           echo "Runtime smoke test PASS; pid=$PID"
 
