@@ -6,18 +6,20 @@
 	objects = {
 /* Begin PBXBuildFile section */
 		A10000000000000000000001 /* AlcometCoilArchiveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* AlcometCoilArchiveApp.swift */; };
+		A10000000000000000000002 /* ServerConfigHashable.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* ServerConfigHashable.swift */; };
 /* End PBXBuildFile section */
 /* Begin PBXFileReference section */
 		A20000000000000000000001 /* AlcometCoilArchiveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlcometCoilArchiveApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000000000003 /* AlcometCoilArchive.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AlcometCoilArchive.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000004 /* ServerConfigHashable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConfigHashable.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 /* Begin PBXFrameworksBuildPhase section */
 		A30000000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 /* Begin PBXGroup section */
 		A40000000000000000000001 = {isa = PBXGroup; children = (A40000000000000000000002 /* AlcometCoilArchive */, A40000000000000000000003 /* Products */); sourceTree = "<group>"; };
-		A40000000000000000000002 /* AlcometCoilArchive */ = {isa = PBXGroup; children = (A20000000000000000000001 /* AlcometCoilArchiveApp.swift */, A20000000000000000000002 /* Info.plist */); path = AlcometCoilArchive; sourceTree = "<group>"; };
+		A40000000000000000000002 /* AlcometCoilArchive */ = {isa = PBXGroup; children = (A20000000000000000000001 /* AlcometCoilArchiveApp.swift */, A20000000000000000000004 /* ServerConfigHashable.swift */, A20000000000000000000002 /* Info.plist */); path = AlcometCoilArchive; sourceTree = "<group>"; };
 		A40000000000000000000003 /* Products */ = {isa = PBXGroup; children = (A20000000000000000000003 /* AlcometCoilArchive.app */); name = Products; sourceTree = "<group>"; };
 /* End PBXGroup section */
 /* Begin PBXNativeTarget section */
@@ -30,7 +32,7 @@
 		A70000000000000000000001 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 /* Begin PBXSourcesBuildPhase section */
-		A60000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001); runOnlyForDeploymentPostprocessing = 0; };
+		A60000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001, A10000000000000000000002); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 /* Begin XCBuildConfiguration section */
 		B00000000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 5.0;}; name = Debug;};
