@@ -68,13 +68,18 @@ jobs:
           test -s "$STOREPASS"
           test -s "$KEYPASS"
 
-      - name: Apply Android v1.4.0 reliability patch
+      - name: Apply Android v1.4.1 reliability patches
         run: |
           python3 mobile/android/patch_v140.py
-          grep -q 'APP_VERSION = "1.4.0"' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
+          python3 mobile/android/patch_v141.py
+          grep -q 'APP_VERSION = "1.4.1"' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
           grep -q 'FILE_READ_TIMEOUT_MS = 180000' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
-          grep -q 'requestHttp' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
-          grep -q "versionName '1.4.0'" mobile/android/app/build.gradle
+          grep -q 'requestReferer' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
+          grep -q 'requestCookie' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
+          grep -q 'toolbarActionLayout' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
+          ! grep -A75 'private void saveHttpDownload' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java | grep -q 'web.getUrl()'
+          grep -q "versionCode 16" mobile/android/app/build.gradle
+          grep -q "versionName '1.4.1'" mobile/android/app/build.gradle
 
       - name: Build unsigned production APK
         working-directory: mobile/android
@@ -86,7 +91,7 @@ jobs:
           set -euo pipefail
           BT="$ANDROID_HOME/build-tools/35.0.0"
           UNSIGNED="mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk"
-          OUT="Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.0.apk"
+          OUT="Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.1.apk"
           test -s "$UNSIGNED"
           "$BT/apksigner" sign \
             --ks "$HOME/.alcomet-signing/alcomet-release.jks" \
@@ -98,17 +103,17 @@ jobs:
           "$BT/apksigner" verify --verbose --print-certs "$OUT"
           "$BT/aapt" dump badging "$OUT" | tee apk-badging.txt
           grep -q "package: name='com.alcomet.rollingcoilarchive'" apk-badging.txt
-          grep -q "versionCode='15' versionName='1.4.0'" apk-badging.txt
+          grep -q "versionCode='16' versionName='1.4.1'" apk-badging.txt
           grep -q "launchable-activity: name='com.alcomet.rollingcoilarchive.SafeMobileActivity'" apk-badging.txt
-          sha256sum "$OUT" > Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.0_SHA256.txt
+          sha256sum "$OUT" > Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.1_SHA256.txt
 
       - name: Upload production APK
         uses: actions/upload-artifact@v4
         with:
-          name: Alcomet-Rolling-Shop-Coil-Archive-Android-v1.4.0-Production
+          name: Alcomet-Rolling-Shop-Coil-Archive-Android-v1.4.1-Production
           path: |
-            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.0.apk
-            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.0_SHA256.txt
+            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.1.apk
+            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.1_SHA256.txt
             apk-badging.txt
           if-no-files-found: error
 
@@ -134,7 +139,7 @@ jobs:
             sleep 3
           done
           test "$("$ADB" shell getprop sys.boot_completed | tr -d '\r')" = "1"
-          "$ADB" install -r Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.0.apk
+          "$ADB" install -r Alcomet_Rolling_Shop_Coil_Archive_Android_v1.4.1.apk
           "$ADB" logcat -c
           "$ADB" shell am start -W -n com.alcomet.rollingcoilarchive/com.alcomet.rollingcoilarchive.SafeMobileActivity | tee android15-launch.txt
           sleep 4
@@ -147,7 +152,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Alcomet-Android-v1.4.0-Smoke-Diagnostics
+          name: Alcomet-Android-v1.4.1-Smoke-Diagnostics
           path: |
             android15-launch.txt
             android15-launch.png
