@@ -70,10 +70,10 @@ public class BarcodeScannerActivity extends Activity implements SurfaceHolder.Ca
         top.setPadding(dp(12),dp(10),dp(12),dp(10));
         top.setBackgroundColor(0x99000000);
         TextView title=new TextView(this);
-        title.setText("SCAN COIL QR / BARCODE");title.setTextColor(Color.WHITE);title.setTextSize(15);title.setGravity(Gravity.CENTER);
+        title.setText("AUTO SCAN COIL QR / BARCODE");title.setTextColor(Color.WHITE);title.setTextSize(15);title.setGravity(Gravity.CENTER);
         top.addView(title,new LinearLayout.LayoutParams(-1,-2));
         status=new TextView(this);
-        status.setText("For 1D barcode, keep the whole barcode horizontal inside the blue frame");status.setTextColor(0xffd5e9f5);status.setTextSize(12);status.setGravity(Gravity.CENTER);
+        status.setText("Scanning starts automatically • keep the whole 1D barcode horizontal inside the blue frame");status.setTextColor(0xffd5e9f5);status.setTextSize(12);status.setGravity(Gravity.CENTER);
         top.addView(status,new LinearLayout.LayoutParams(-1,-2));
         FrameLayout.LayoutParams tp=new FrameLayout.LayoutParams(-1,dp(82),Gravity.TOP);
         root.addView(top,tp);
@@ -115,12 +115,10 @@ public class BarcodeScannerActivity extends Activity implements SurfaceHolder.Ca
             if(m!=null&&m.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO))p.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
             else if(m!=null&&m.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE))p.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
             else if(m!=null&&m.contains(Camera.Parameters.FOCUS_MODE_AUTO))p.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
-            if(p.isZoomSupported()&&p.getMaxZoom()>0){
-                // Small initial zoom helps narrow 1D bars occupy more pixels without forcing the user too close.
-                p.setZoom(Math.min(1,p.getMaxZoom()));
-            }
+            if(p.isZoomSupported()&&p.getMaxZoom()>0)p.setZoom(Math.min(1,p.getMaxZoom()));
             camera.setParameters(p);
             camera.startPreview();
+            if(status!=null)status.setText("AUTO SCANNING • point the camera at the code • result opens automatically");
             scheduleFrame();
         }catch(Exception e){
             Toast.makeText(this,"Camera unavailable: "+e.getClass().getSimpleName(),Toast.LENGTH_LONG).show();
@@ -152,28 +150,21 @@ public class BarcodeScannerActivity extends Activity implements SurfaceHolder.Ca
         try{
             Camera.Size z=c.getParameters().getPreviewSize();
             r=decodeBest(data,z.width,z.height);
-            if(r==null){
-                byte[]cw=rotateCW(data,z.width,z.height);
-                r=decodeBest(cw,z.height,z.width);
-            }
-            if(r==null){
-                byte[]ccw=rotateCCW(data,z.width,z.height);
-                r=decodeBest(ccw,z.height,z.width);
-            }
+            if(r==null){byte[]cw=rotateCW(data,z.width,z.height);r=decodeBest(cw,z.height,z.width);}
+            if(r==null){byte[]ccw=rotateCCW(data,z.width,z.height);r=decodeBest(ccw,z.height,z.width);}
             if(r!=null){
-                if(status!=null)status.setText("Read: "+r.getText());
+                if(status!=null)status.setText("FOUND "+r.getText()+" • opening automatically…");
+                vibrateRead();
                 Intent i=new Intent().putExtra(EXTRA_RESULT,r.getText());
                 setResult(RESULT_OK,i);
                 finish();
                 return;
             }
         }catch(Exception ignored){}
-        handler.postDelayed(this::scheduleFrame,90);
+        handler.postDelayed(this::scheduleFrame,80);
     }
 
     private Result decodeBest(byte[]yuv,int w,int h){
-        // 1D labels are much more reliable when the reader is also given center crops,
-        // not only the full camera frame with surrounding report text/buttons.
         Result r=decodeRegion(yuv,w,h,0,0,w,h);
         if(r!=null)return r;
         int ch=Math.max(1,(int)(h*0.58f));
@@ -194,22 +185,21 @@ public class BarcodeScannerActivity extends Activity implements SurfaceHolder.Ca
             MultiFormatReader reader=new MultiFormatReader();
             BinaryBitmap bmp=new BinaryBitmap(new HybridBinarizer(src));
             try{return reader.decode(bmp,hints);}catch(NotFoundException ignored){}
-            // Handles displays/labels with reversed contrast or camera exposure edge cases.
             BinaryBitmap inv=new BinaryBitmap(new HybridBinarizer(src.invert()));
             return reader.decode(inv,hints);
         }catch(Exception e){return null;}
     }
 
-    private byte[] rotateCW(byte[]d,int w,int h){
-        byte[]r=new byte[w*h];int k=0;
-        for(int x=0;x<w;x++)for(int y=h-1;y>=0;y--)r[k++]=d[y*w+x];
-        return r;
+    private void vibrateRead(){
+        try{
+            Vibrator v=(Vibrator)getSystemService(VIBRATOR_SERVICE);
+            if(v==null)return;
+            if(Build.VERSION.SDK_INT>=26)v.vibrate(VibrationEffect.createOneShot(45,VibrationEffect.DEFAULT_AMPLITUDE));else v.vibrate(45);
+        }catch(Exception ignored){}
     }
-    private byte[] rotateCCW(byte[]d,int w,int h){
-        byte[]r=new byte[w*h];int k=0;
-        for(int x=w-1;x>=0;x--)for(int y=0;y<h;y++)r[k++]=d[y*w+x];
-        return r;
-    }
+
+    private byte[] rotateCW(byte[]d,int w,int h){byte[]r=new byte[w*h];int k=0;for(int x=0;x<w;x++)for(int y=h-1;y>=0;y--)r[k++]=d[y*w+x];return r;}
+    private byte[] rotateCCW(byte[]d,int w,int h){byte[]r=new byte[w*h];int k=0;for(int x=w-1;x>=0;x--)for(int y=0;y<h;y++)r[k++]=d[y*w+x];return r;}
     private void stopCamera(){
         handler.removeCallbacksAndMessages(null);
         if(camera!=null){
