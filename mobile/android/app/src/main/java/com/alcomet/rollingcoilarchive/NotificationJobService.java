@@ -32,13 +32,13 @@ public class NotificationJobService extends JobService {
         if(Build.VERSION.SDK_INT>=33&&c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return false;
         NotificationManager nm=(NotificationManager)c.getSystemService(NOTIFICATION_SERVICE);
         if(nm==null)return false;
-        if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CHANNEL,"Coil Watchlist",NotificationManager.IMPORTANCE_DEFAULT));
+        if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CHANNEL,"Coil Favorites",NotificationManager.IMPORTANCE_DEFAULT));
         Intent open=new Intent(c,SafeMobileActivity.class).putExtra("open_path","/").addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi=PendingIntent.getActivity(c,TEST_ID,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(c,CHANNEL):new Notification.Builder(c);
         b.setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("CoilReport notification test")
-            .setContentText("Android Watchlist notifications are working.")
+            .setContentText("Favorite coil notifications are working.")
             .setAutoCancel(true)
             .setContentIntent(pi);
         nm.notify(TEST_ID,b.build());
@@ -56,7 +56,7 @@ public class NotificationJobService extends JobService {
         if(c==null||c.validate()!=null)return;
         MobileFeatureClient.Policy p=MobileFeatureClient.fetchPolicy(c);
         if(!p.watchlist||!p.notifications){configure(this,p);return;}
-        Set<String>w=MobileWatchStore.getWatches(this);
+        Set<String>w=MobileWatchStore.getNotificationWatches(this);
         if(w.isEmpty())return;
         long now=System.currentTimeMillis()/1000L,last=MobileWatchStore.lastPoll(this);
         if(last<=0)last=now-120;
@@ -81,7 +81,7 @@ public class NotificationJobService extends JobService {
         if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return false;
         NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
         if(nm==null)return false;
-        if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CHANNEL,"Coil Watchlist",NotificationManager.IMPORTANCE_DEFAULT));
+        if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CHANNEL,"Coil Favorites",NotificationManager.IMPORTANCE_DEFAULT));
         Intent open=new Intent(this,SafeMobileActivity.class).putExtra("open_path",path).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi=PendingIntent.getActivity(this,id.hashCode(),open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,CHANNEL):new Notification.Builder(this);
