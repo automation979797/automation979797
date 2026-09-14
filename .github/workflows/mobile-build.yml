@@ -10,7 +10,7 @@ on:
 
 jobs:
   android:
-    name: Android v1.5.1 Production
+    name: Android v1.5.2 Production
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -67,42 +67,49 @@ jobs:
           test -s "$STOREPASS"
           test -s "$KEYPASS"
 
-      - name: Validate and apply Android v1.5.1 patches
+      - name: Validate and apply Android v1.5.2 patches
         run: |
           set -euo pipefail
-          python3 -m py_compile mobile/android/patch_v140.py mobile/android/patch_v141.py mobile/android/patch_v142.py mobile/android/patch_v150.py mobile/android/patch_v151.py mobile/android/patch_v152.py
+          python3 -m py_compile mobile/android/patch_v140.py mobile/android/patch_v141.py mobile/android/patch_v142.py mobile/android/patch_v150.py mobile/android/patch_v151.py mobile/android/patch_v152.py mobile/android/patch_v153.py
           python3 mobile/android/patch_v140.py
           python3 mobile/android/patch_v141.py
           python3 mobile/android/patch_v142.py
           python3 mobile/android/patch_v150.py
           python3 mobile/android/patch_v151.py
           python3 mobile/android/patch_v152.py
+          python3 mobile/android/patch_v153.py
           SRC=mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
           SCAN=mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/BarcodeScannerActivity.java
+          FAV=mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/FavoritesActivity.java
+          STORE=mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileWatchStore.java
           NOTIFY=mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/NotificationJobService.java
-          grep -q 'APP_VERSION = "1.5.1"' "$SRC"
+          grep -q 'APP_VERSION = "1.5.2"' "$SRC"
           grep -q 'FILE_READ_TIMEOUT_MS = 180000' "$SRC"
           grep -q 'verifyPolicyForAction(true)' "$SRC"
           grep -q 'verifyPolicyForAction(false)' "$SRC"
-          grep -q 'applyMobilePolicy(MobileFeatureClient.Policy.disabled())' "$SRC"
-          grep -q 'Test notification' "$SRC"
-          grep -q 'NotificationJobService.showTestNotification' "$SRC"
+          grep -q 'openFavoritesPage' "$SRC"
+          grep -q 'FavoritesActivity.class' "$SRC"
+          grep -q 'Barcode read • opening coil' "$SRC"
+          grep -q 'AUTO SCANNING' "$SCAN"
           grep -q 'DecodeHintType.TRY_HARDER' "$SCAN"
-          grep -q 'decodeBest' "$SCAN"
-          grep -q 'rotateCW' "$SCAN"
-          grep -q 'rotateCCW' "$SCAN"
-          grep -q 'BarcodeFormat.QR_CODE' "$SCAN"
           grep -q 'BarcodeFormat.CODE_128' "$SCAN"
           grep -q 'BarcodeFormat.CODE_39' "$SCAN"
-          grep -q 'BarcodeFormat.CODE_93' "$SCAN"
-          grep -q 'BarcodeFormat.ITF' "$SCAN"
-          grep -q 'showTestNotification' "$NOTIFY"
+          grep -q 'class FavoritesActivity' "$FAV"
+          grep -q 'Scan + Add' "$FAV"
+          grep -q 'Open Report' "$FAV"
+          grep -q 'Clear All' "$FAV"
+          grep -q 'Test Notification' "$FAV"
+          grep -q 'Favorites are disabled by Engineering' "$FAV"
+          grep -q 'getNotificationWatches' "$STORE"
+          grep -q 'setMuted' "$STORE"
+          grep -q 'getNotificationWatches' "$NOTIFY"
           grep -q 'js.cancel(JOB_ID)' "$NOTIFY"
+          grep -q 'android:name=".FavoritesActivity"' mobile/android/app/src/main/AndroidManifest.xml
           ! grep -Rqi 'firebase\|fcm.googleapis\|onesignal' mobile/android/app/src/main/java
           ! grep -A75 'private void saveHttpDownload' "$SRC" | grep -q 'web.getUrl()'
           grep -q 'port==5050' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MainActivity.java
-          grep -q "versionCode 19" mobile/android/app/build.gradle
-          grep -q "versionName '1.5.1'" mobile/android/app/build.gradle
+          grep -q "versionCode 20" mobile/android/app/build.gradle
+          grep -q "versionName '1.5.2'" mobile/android/app/build.gradle
           grep -q "com.google.zxing:core:3.5.3" mobile/android/app/build.gradle
           grep -q 'android.permission.CAMERA' mobile/android/app/src/main/AndroidManifest.xml
           grep -q 'android.permission.POST_NOTIFICATIONS' mobile/android/app/src/main/AndroidManifest.xml
@@ -118,7 +125,7 @@ jobs:
           set -euo pipefail
           BT="$ANDROID_HOME/build-tools/35.0.0"
           UNSIGNED="mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk"
-          OUT="Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.1.apk"
+          OUT="Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.2.apk"
           test -s "$UNSIGNED"
           "$BT/apksigner" sign \
             --ks "$HOME/.alcomet-signing/alcomet-release.jks" \
@@ -131,21 +138,21 @@ jobs:
           "$BT/aapt" dump badging "$OUT" | tee apk-badging.txt
           "$BT/aapt" dump permissions "$OUT" | tee apk-permissions.txt
           grep -q "package: name='com.alcomet.rollingcoilarchive'" apk-badging.txt
-          grep -q "versionCode='19' versionName='1.5.1'" apk-badging.txt
+          grep -q "versionCode='20' versionName='1.5.2'" apk-badging.txt
           grep -q "launchable-activity: name='com.alcomet.rollingcoilarchive.SafeMobileActivity'" apk-badging.txt
           grep -q 'android.permission.CAMERA' apk-permissions.txt
           grep -q 'android.permission.POST_NOTIFICATIONS' apk-permissions.txt
           grep -q 'Verified using v2 scheme.*true' apk-signing.txt
           grep -q 'Verified using v3 scheme.*true' apk-signing.txt
-          sha256sum "$OUT" > Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.1_SHA256.txt
+          sha256sum "$OUT" > Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.2_SHA256.txt
 
       - name: Upload production APK
         uses: actions/upload-artifact@v4
         with:
-          name: Alcomet-Rolling-Shop-Coil-Archive-Android-v1.5.1-Production
+          name: Alcomet-Rolling-Shop-Coil-Archive-Android-v1.5.2-Production
           path: |
-            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.1.apk
-            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.1_SHA256.txt
+            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.2.apk
+            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.2_SHA256.txt
             apk-badging.txt
             apk-permissions.txt
             apk-signing.txt
