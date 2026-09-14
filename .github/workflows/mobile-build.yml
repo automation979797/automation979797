@@ -44,13 +44,16 @@ jobs:
           set -euo pipefail
           SIGN_DIR="$HOME/.alcomet-signing"
           KEYSTORE="$SIGN_DIR/alcomet-release.jks"
-          PASSFILE="$SIGN_DIR/password.txt"
+          STOREPASS="$SIGN_DIR/storepass.txt"
+          KEYPASS="$SIGN_DIR/keypass.txt"
           mkdir -p "$SIGN_DIR"
           chmod 700 "$SIGN_DIR"
-          if [ ! -s "$KEYSTORE" ] || [ ! -s "$PASSFILE" ]; then
+          if [ ! -s "$KEYSTORE" ] || [ ! -s "$STOREPASS" ] || [ ! -s "$KEYPASS" ]; then
+            rm -f "$KEYSTORE" "$STOREPASS" "$KEYPASS"
             PASS="$(openssl rand -hex 32)"
-            printf '%s' "$PASS" > "$PASSFILE"
-            chmod 600 "$PASSFILE"
+            printf '%s\n' "$PASS" > "$STOREPASS"
+            printf '%s\n' "$PASS" > "$KEYPASS"
+            chmod 600 "$STOREPASS" "$KEYPASS"
             keytool -genkeypair \
               -keystore "$KEYSTORE" \
               -storepass "$PASS" \
@@ -62,7 +65,8 @@ jobs:
               -dname 'CN=Alcomet Rolling Shop Coil Archive, OU=Rolling Shop, O=Alcomet AD, L=Shumen, C=BG'
           fi
           test -s "$KEYSTORE"
-          test -s "$PASSFILE"
+          test -s "$STOREPASS"
+          test -s "$KEYPASS"
 
       - name: Stamp wrapper version
         run: |
@@ -84,8 +88,8 @@ jobs:
           "$BT/apksigner" sign \
             --ks "$HOME/.alcomet-signing/alcomet-release.jks" \
             --ks-key-alias alcometcoil \
-            --ks-pass "file:$HOME/.alcomet-signing/password.txt" \
-            --key-pass "file:$HOME/.alcomet-signing/password.txt" \
+            --ks-pass "file:$HOME/.alcomet-signing/storepass.txt" \
+            --key-pass "file:$HOME/.alcomet-signing/keypass.txt" \
             --out "$OUT" \
             "$UNSIGNED"
           "$BT/apksigner" verify --verbose --print-certs "$OUT"
