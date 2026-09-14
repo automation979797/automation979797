@@ -33,7 +33,7 @@ public class NotificationJobService extends JobService {
         NotificationManager nm=(NotificationManager)c.getSystemService(NOTIFICATION_SERVICE);
         if(nm==null)return false;
         if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel(CHANNEL,"Coil Favorites",NotificationManager.IMPORTANCE_DEFAULT));
-        Intent open=new Intent(c,SafeMobileActivity.class).putExtra("open_path","/").addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        Intent open=new Intent(c,FavoritesActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi=PendingIntent.getActivity(c,TEST_ID,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(c,CHANNEL):new Notification.Builder(c);
         b.setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -56,9 +56,17 @@ public class NotificationJobService extends JobService {
         if(c==null||c.validate()!=null)return;
         MobileFeatureClient.Policy p=MobileFeatureClient.fetchPolicy(c);
         if(!p.watchlist||!p.notifications){configure(this,p);return;}
+
+        long now=System.currentTimeMillis()/1000L;
         Set<String>w=MobileWatchStore.getNotificationWatches(this);
-        if(w.isEmpty())return;
-        long now=System.currentTimeMillis()/1000L,last=MobileWatchStore.lastPoll(this);
+        // Do not keep an old cursor while there are no active alert subscriptions.
+        // Otherwise unmuting/adding a favorite later could replay old historical events.
+        if(w.isEmpty()){
+            MobileWatchStore.setLastPoll(this,now);
+            return;
+        }
+
+        long last=MobileWatchStore.lastPoll(this);
         if(last<=0)last=now-120;
         JSONArray a=MobileFeatureClient.fetchEvents(c,last);
         if(a==null)return;
@@ -71,7 +79,9 @@ public class NotificationJobService extends JobService {
             String prev=e.optString("previous_machine");
             String type=e.optString("type");
             String title="Coil "+coil;
-            String text=(p.journeyNotifications&&"handoff".equals(type)&&!prev.isEmpty())?prev+" → "+machine:"Detected at "+machine;
+            String machineLabel=MachineNames.label(machine);
+            String prevLabel=MachineNames.label(prev);
+            String text=(p.journeyNotifications&&"handoff".equals(type)&&!prev.isEmpty())?prevLabel+" → "+machineLabel:"Detected at "+machineLabel;
             if(notifyEvent(id,title,text,e.optString("report_url","/")))MobileWatchStore.markNotified(this,id);
         }
         if(permissionReady)MobileWatchStore.setLastPoll(this,now);
