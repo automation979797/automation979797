@@ -10,7 +10,7 @@ on:
 
 jobs:
   android:
-    name: Android Production APK
+    name: Android Build + Sign
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -138,48 +138,75 @@ jobs:
           grep -q 'Verified using v3 scheme.*true' apk-signing.txt
           sha256sum "$OUT" > Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.0_SHA256.txt
 
+      - name: Upload signed candidate for required runtime gate
+        uses: actions/upload-artifact@v4
+        with:
+          name: Alcomet-Android-v1.5.0-Candidate
+          path: |
+            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.0.apk
+            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.0_SHA256.txt
+            apk-badging.txt
+            apk-permissions.txt
+            apk-signing.txt
+          if-no-files-found: error
+
+  android_runtime:
+    name: Android 15 Runtime + Production Gate
+    needs: android
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Alcomet-Android-v1.5.0-Candidate
+          path: candidate
+
       - name: Required Android 15 runtime launch smoke test
-        timeout-minutes: 10
         shell: bash
         run: |
           set -euo pipefail
+          APK="$PWD/candidate/Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.0.apk"
+          test -s "$APK"
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
           ADB="$ANDROID_HOME/platform-tools/adb"
           EMULATOR="$ANDROID_HOME/emulator/emulator"
-          export ANDROID_AVD_HOME="$RUNNER_TEMP/alcomet-avd"
-          mkdir -p "$ANDROID_AVD_HOME"
-          "$SDKMANAGER" 'emulator' 'system-images;android-35;google_apis;x86_64'
+          test -x "$SDKMANAGER"
+          test -x "$AVDMANAGER"
+          ARCH="$(uname -m)"
+          if [ "$ARCH" = "arm64" ]; then ABI='arm64-v8a'; else ABI='x86_64'; fi
+          PKG="system-images;android-35;google_apis;$ABI"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" 'platform-tools' 'emulator' "$PKG"
           test -x "$ADB"
           test -x "$EMULATOR"
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/alcomet-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
           AVD_DIR="$ANDROID_AVD_HOME/alcometSmoke.avd"
-          rm -rf "$AVD_DIR" "$ANDROID_AVD_HOME/alcometSmoke.ini"
-          echo no | "$AVDMANAGER" create avd --force --name alcometSmoke --package 'system-images;android-35;google_apis;x86_64' --path "$AVD_DIR"
-          if [ ! -s "$ANDROID_AVD_HOME/alcometSmoke.ini" ]; then
-            printf 'avd.ini.encoding=UTF-8\npath=%s\npath.rel=avd/alcometSmoke.avd\ntarget=android-35\n' "$AVD_DIR" > "$ANDROID_AVD_HOME/alcometSmoke.ini"
-          fi
-          test -s "$ANDROID_AVD_HOME/alcometSmoke.ini"
-          test -d "$AVD_DIR"
+          echo no | "$AVDMANAGER" create avd --force --name alcometSmoke --package "$PKG" --path "$AVD_DIR"
           "$AVDMANAGER" list avd | tee avd-list.txt
           grep -q 'Name: alcometSmoke' avd-list.txt
           "$ADB" kill-server || true
           "$EMULATOR" -avd alcometSmoke -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data -gpu swiftshader_indirect > emulator.log 2>&1 &
           EMU_PID=$!
-          sleep 5
-          if ! kill -0 "$EMU_PID" 2>/dev/null; then
-            cat emulator.log >&2
-            exit 1
-          fi
-          timeout 150s "$ADB" wait-for-device || { cat emulator.log >&2; exit 1; }
+          DEVICE_OK=0
+          for i in $(seq 1 120); do
+            STATE="$("$ADB" get-state 2>/dev/null || true)"
+            if [ "$STATE" = "device" ]; then DEVICE_OK=1; break; fi
+            if ! kill -0 "$EMU_PID" 2>/dev/null; then cat emulator.log >&2; exit 1; fi
+            sleep 2
+          done
+          test "$DEVICE_OK" = "1"
           BOOT_OK=0
-          for i in $(seq 1 100); do
+          for i in $(seq 1 120); do
             BOOT="$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
             if [ "$BOOT" = "1" ]; then BOOT_OK=1; break; fi
             if ! kill -0 "$EMU_PID" 2>/dev/null; then cat emulator.log >&2; exit 1; fi
-            sleep 3
+            sleep 2
           done
           test "$BOOT_OK" = "1"
-          "$ADB" install -r Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.0.apk
+          "$ADB" install -r "$APK" | tee android15-install.txt
+          grep -q 'Success' android15-install.txt
           "$ADB" logcat -c
           "$ADB" shell am start -W -n com.alcomet.rollingcoilarchive/com.alcomet.rollingcoilarchive.SafeMobileActivity | tee android15-launch.txt
           sleep 5
@@ -194,19 +221,21 @@ jobs:
           fi
           "$ADB" exec-out screencap -p > android15-launch.png
           test -s android15-launch.png
-          echo "Required runtime smoke test PASS; pid=$PID"
+          echo "Required Android 15 runtime smoke test PASS; pid=$PID architecture=$ARCH abi=$ABI" | tee android15-result.txt
 
-      - name: Upload production APK
+      - name: Publish production APK only after runtime gate passes
         uses: actions/upload-artifact@v4
         with:
           name: Alcomet-Rolling-Shop-Coil-Archive-Android-v1.5.0-Production
           path: |
-            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.0.apk
-            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.0_SHA256.txt
-            apk-badging.txt
-            apk-permissions.txt
-            apk-signing.txt
+            candidate/Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.0.apk
+            candidate/Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.0_SHA256.txt
+            candidate/apk-badging.txt
+            candidate/apk-permissions.txt
+            candidate/apk-signing.txt
+            android15-install.txt
             android15-launch.txt
+            android15-result.txt
           if-no-files-found: error
 
       - name: Upload Android 15 smoke diagnostics
@@ -215,8 +244,10 @@ jobs:
         with:
           name: Alcomet-Android-v1.5.0-Smoke-Diagnostics
           path: |
+            android15-install.txt
             android15-launch.txt
             android15-launch.png
+            android15-result.txt
             emulator.log
             package-dump.txt
             avd-list.txt
