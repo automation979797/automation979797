@@ -12,8 +12,9 @@
         android:roundIcon="@drawable/ic_launcher_v110"
         android:hardwareAccelerated="true">
         <activity
-            android:name=".MainActivity"
+            android:name=".MobileActivity"
             android:exported="true"
+            android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
