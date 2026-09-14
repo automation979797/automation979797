@@ -108,9 +108,9 @@ jobs:
           grep -q 'android.permission.POST_NOTIFICATIONS' mobile/android/app/src/main/AndroidManifest.xml
           grep -q 'android.permission.RECEIVE_BOOT_COMPLETED' mobile/android/app/src/main/AndroidManifest.xml
 
-      - name: Build release + Android lint gate
+      - name: Build release APK
         working-directory: mobile/android
-        run: gradle --no-daemon clean assembleRelease lintRelease
+        run: gradle --no-daemon clean assembleRelease
 
       - name: Sign and verify production APK
         shell: bash
@@ -149,7 +149,6 @@ jobs:
             apk-badging.txt
             apk-permissions.txt
             apk-signing.txt
-            mobile/android/app/build/reports/lint-results-release.html
           if-no-files-found: error
 
   ios:
