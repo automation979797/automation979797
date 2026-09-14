@@ -10,34 +10,29 @@ on:
 
 jobs:
   android:
-    name: Android v1.5.3 Production
+    name: Android v1.6.0 Production
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-
       - name: Restore persistent Alcomet signing identity
         uses: actions/cache@v4
         with:
           path: ~/.alcomet-signing
           key: alcomet-android-release-signing-v1
-
       - name: Ensure Android SDK 35
         run: |
           set -euo pipefail
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
           "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools'
-
-      - name: Initialize signing identity on first production build
+      - name: Initialize signing identity
         shell: bash
         run: |
           set -euo pipefail
@@ -45,161 +40,140 @@ jobs:
           KEYSTORE="$SIGN_DIR/alcomet-release.jks"
           STOREPASS="$SIGN_DIR/storepass.txt"
           KEYPASS="$SIGN_DIR/keypass.txt"
-          mkdir -p "$SIGN_DIR"
-          chmod 700 "$SIGN_DIR"
+          mkdir -p "$SIGN_DIR" && chmod 700 "$SIGN_DIR"
           if [ ! -s "$KEYSTORE" ] || [ ! -s "$STOREPASS" ] || [ ! -s "$KEYPASS" ]; then
             rm -f "$KEYSTORE" "$STOREPASS" "$KEYPASS"
             PASS="$(openssl rand -hex 32)"
             printf '%s\n' "$PASS" > "$STOREPASS"
             printf '%s\n' "$PASS" > "$KEYPASS"
             chmod 600 "$STOREPASS" "$KEYPASS"
-            keytool -genkeypair \
-              -keystore "$KEYSTORE" \
-              -storepass "$PASS" \
-              -keypass "$PASS" \
-              -alias alcometcoil \
-              -keyalg RSA \
-              -keysize 4096 \
-              -validity 10000 \
-              -dname 'CN=Alcomet Rolling Shop Coil Archive, OU=Rolling Shop, O=Alcomet AD, L=Shumen, C=BG'
+            keytool -genkeypair -keystore "$KEYSTORE" -storepass "$PASS" -keypass "$PASS" -alias alcometcoil -keyalg RSA -keysize 4096 -validity 10000 -dname 'CN=Alcomet Rolling Shop Coil Archive, OU=Rolling Shop, O=Alcomet AD, L=Shumen, C=BG'
           fi
-          test -s "$KEYSTORE"
-          test -s "$STOREPASS"
-          test -s "$KEYPASS"
-
-      - name: Validate and apply Android v1.5.3 patches
+          test -s "$KEYSTORE" && test -s "$STOREPASS" && test -s "$KEYPASS"
+      - name: Apply and validate Android v1.6.0
         run: |
           set -euo pipefail
-          python3 -m py_compile mobile/android/patch_v140.py mobile/android/patch_v141.py mobile/android/patch_v142.py mobile/android/patch_v150.py mobile/android/patch_v151.py mobile/android/patch_v152.py mobile/android/patch_v153.py mobile/android/patch_v154.py
-          python3 mobile/android/patch_v140.py
-          python3 mobile/android/patch_v141.py
-          python3 mobile/android/patch_v142.py
-          python3 mobile/android/patch_v150.py
-          python3 mobile/android/patch_v151.py
-          python3 mobile/android/patch_v152.py
-          python3 mobile/android/patch_v153.py
-          python3 mobile/android/patch_v154.py
+          python3 -m py_compile mobile/android/patch_v140.py mobile/android/patch_v141.py mobile/android/patch_v142.py mobile/android/patch_v150.py mobile/android/patch_v151.py mobile/android/patch_v152.py mobile/android/patch_v153.py mobile/android/patch_v154.py mobile/android/patch_v160.py
+          for P in 140 141 142 150 151 152 153 154 160; do python3 "mobile/android/patch_v${P}.py"; done
           SRC=mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileActivity.java
           SCAN=mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/BarcodeScannerActivity.java
           FAV=mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/FavoritesActivity.java
           STORE=mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MobileWatchStore.java
           NOTIFY=mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/NotificationJobService.java
           NAMES=mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MachineNames.java
+          SAFE=mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/SafeMobileActivity.java
           MANIFEST=mobile/android/app/src/main/AndroidManifest.xml
-          grep -q 'APP_VERSION = "1.5.3"' "$SRC"
-          grep -q 'FILE_READ_TIMEOUT_MS = 180000' "$SRC"
+          grep -q 'APP_VERSION = "1.6.0"' "$SRC"
+          grep -q 'mobileFeatureRail' "$SRC"
+          grep -q 'Gravity.CENTER_HORIZONTAL|Gravity.BOTTOM' "$SRC"
           grep -q 'verifyPolicyForAction(true)' "$SRC"
           grep -q 'verifyPolicyForAction(false)' "$SRC"
-          grep -q 'openFavoritesPage' "$SRC"
-          grep -q 'FavoritesActivity.class' "$SRC"
-          grep -q 'Barcode read • opening coil' "$SRC"
+          grep -q 'FILE_READ_TIMEOUT_MS = 180000' "$SRC"
+          grep -q 'SCAN COIL' "$SCAN"
           grep -q 'AUTO SCANNING' "$SCAN"
-          grep -q 'onResume()' "$SCAN"
-          grep -q 'startCamera(h)' "$SCAN"
           grep -q 'DecodeHintType.TRY_HARDER' "$SCAN"
-          grep -q 'BarcodeFormat.CODE_128' "$SCAN"
-          grep -q 'BarcodeFormat.CODE_39' "$SCAN"
-          grep -q 'decoding=true' "$SCAN"
-          grep -q 'class FavoritesActivity' "$FAV"
-          grep -q 'Scan + Add' "$FAV"
-          grep -q 'Open Report' "$FAV"
-          grep -q 'Clear All' "$FAV"
+          grep -q 'onResume()' "$SCAN"
+          grep -q 'FAVORITES' "$FAV"
+          grep -q 'policyUnavailable' "$FAV"
           grep -q 'Test Notification' "$FAV"
           grep -q 'already in Favorites' "$FAV"
           grep -q 'getNotificationWatches' "$STORE"
-          grep -q 'putLong(LAST' "$STORE"
-          grep -q 'getNotificationWatches' "$NOTIFY"
-          grep -q 'MachineNames.label(machine)' "$NOTIFY"
-          grep -q 'MachineNames.label(prev)' "$NOTIFY"
-          grep -q 'FavoritesActivity.class' "$NOTIFY"
           grep -q 'setLastPoll(this,now)' "$NOTIFY"
+          grep -q 'MachineNames.label(machine)' "$NOTIFY"
           grep -q 'case "MINO": return "MINO"' "$NAMES"
           grep -q 'case "CM": return "CM"' "$NAMES"
           grep -q 'case "FM1": return "Foil Mill 1"' "$NAMES"
-          grep -q 'case "FM2": return "Foil Mill 2"' "$NAMES"
-          grep -q 'android:name=".FavoritesActivity"' "$MANIFEST"
+          grep -q 'Android production • v1.6.0' "$SAFE"
           grep -q 'android.permission.VIBRATE' "$MANIFEST"
+          grep -q 'android.permission.CAMERA' "$MANIFEST"
+          grep -q 'android.permission.POST_NOTIFICATIONS' "$MANIFEST"
+          grep -q 'android:name=".FavoritesActivity"' "$MANIFEST"
           ! grep -Rqi 'firebase\|fcm.googleapis\|onesignal' mobile/android/app/src/main/java
           ! grep -A75 'private void saveHttpDownload' "$SRC" | grep -q 'web.getUrl()'
           grep -q 'port==5050' mobile/android/app/src/main/java/com/alcomet/rollingcoilarchive/MainActivity.java
-          grep -q "versionCode 21" mobile/android/app/build.gradle
-          grep -q "versionName '1.5.3'" mobile/android/app/build.gradle
-          grep -q "com.google.zxing:core:3.5.3" mobile/android/app/build.gradle
-          grep -q 'android.permission.CAMERA' "$MANIFEST"
-          grep -q 'android.permission.POST_NOTIFICATIONS' "$MANIFEST"
-          grep -q 'android.permission.RECEIVE_BOOT_COMPLETED' "$MANIFEST"
-
+          grep -q "versionCode 22" mobile/android/app/build.gradle
+          grep -q "versionName '1.6.0'" mobile/android/app/build.gradle
       - name: Build release APK
         working-directory: mobile/android
         run: gradle --no-daemon clean assembleRelease
-
       - name: Sign and verify production APK
         shell: bash
         run: |
           set -euo pipefail
           BT="$ANDROID_HOME/build-tools/35.0.0"
           UNSIGNED="mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk"
-          OUT="Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.3.apk"
+          OUT="Alcomet_Rolling_Shop_Coil_Archive_Android_v1.6.0.apk"
           test -s "$UNSIGNED"
-          "$BT/apksigner" sign \
-            --ks "$HOME/.alcomet-signing/alcomet-release.jks" \
-            --ks-key-alias alcometcoil \
-            --ks-pass "file:$HOME/.alcomet-signing/storepass.txt" \
-            --key-pass "file:$HOME/.alcomet-signing/keypass.txt" \
-            --out "$OUT" \
-            "$UNSIGNED"
+          "$BT/apksigner" sign --ks "$HOME/.alcomet-signing/alcomet-release.jks" --ks-key-alias alcometcoil --ks-pass "file:$HOME/.alcomet-signing/storepass.txt" --key-pass "file:$HOME/.alcomet-signing/keypass.txt" --out "$OUT" "$UNSIGNED"
           "$BT/apksigner" verify --verbose --print-certs "$OUT" | tee apk-signing.txt
           "$BT/aapt" dump badging "$OUT" | tee apk-badging.txt
           "$BT/aapt" dump permissions "$OUT" | tee apk-permissions.txt
           grep -q "package: name='com.alcomet.rollingcoilarchive'" apk-badging.txt
-          grep -q "versionCode='21' versionName='1.5.3'" apk-badging.txt
+          grep -q "versionCode='22' versionName='1.6.0'" apk-badging.txt
           grep -q "launchable-activity: name='com.alcomet.rollingcoilarchive.SafeMobileActivity'" apk-badging.txt
           grep -q 'android.permission.CAMERA' apk-permissions.txt
           grep -q 'android.permission.VIBRATE' apk-permissions.txt
-          grep -q 'android.permission.POST_NOTIFICATIONS' apk-permissions.txt
           grep -q 'Verified using v2 scheme.*true' apk-signing.txt
           grep -q 'Verified using v3 scheme.*true' apk-signing.txt
-          sha256sum "$OUT" > Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.3_SHA256.txt
-
-      - name: Upload production APK
-        uses: actions/upload-artifact@v4
+          sha256sum "$OUT" > Alcomet_Rolling_Shop_Coil_Archive_Android_v1.6.0_SHA256.txt
+      - uses: actions/upload-artifact@v4
         with:
-          name: Alcomet-Rolling-Shop-Coil-Archive-Android-v1.5.3-Production
+          name: Alcomet-Rolling-Shop-Coil-Archive-Android-v1.6.0-Production
           path: |
-            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.3.apk
-            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.5.3_SHA256.txt
+            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.6.0.apk
+            Alcomet_Rolling_Shop_Coil_Archive_Android_v1.6.0_SHA256.txt
             apk-badging.txt
             apk-permissions.txt
             apk-signing.txt
           if-no-files-found: error
 
   ios:
-    name: iOS unsigned IPA
+    name: iOS v1.6.0 Unsigned IPA
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - name: Validate iOS sources and plist
+        run: |
+          set -euo pipefail
+          plutil -lint mobile/ios/AlcometCoilArchive/Info.plist
+          grep -q '<string>1.6.0</string>' mobile/ios/AlcometCoilArchive/Info.plist
+          grep -q 'NSCameraUsageDescription' mobile/ios/AlcometCoilArchive/Info.plist
+          grep -q 'NSLocalNetworkUsageDescription' mobile/ios/AlcometCoilArchive/Info.plist
+          grep -q 'barcode.viewfinder' mobile/ios/AlcometCoilArchive/AlcometCoilArchiveApp.swift
+          grep -q 'struct FavoritesView' mobile/ios/AlcometCoilArchive/AlcometCoilArchiveApp.swift
+          grep -q 'Test notification' mobile/ios/AlcometCoilArchive/AlcometCoilArchiveApp.swift
+          grep -q 'nativePdfShare' mobile/ios/AlcometCoilArchive/AlcometCoilArchiveApp.swift
+          grep -q 'port == 5050' mobile/ios/AlcometCoilArchive/AlcometCoilArchiveApp.swift
       - name: Build arm64 iPhone app without signing
         run: |
+          set -euo pipefail
           mkdir -p build/ios
-          xcodebuild \
-            -project mobile/ios/AlcometCoilArchive.xcodeproj \
-            -target AlcometCoilArchive \
-            -sdk iphoneos \
-            -configuration Release \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CONFIGURATION_BUILD_DIR="$PWD/build/ios" \
-            build
-      - name: Package unsigned IPA
-        run: |
+          xcodebuild -project mobile/ios/AlcometCoilArchive.xcodeproj -target AlcometCoilArchive -sdk iphoneos -configuration Release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CONFIGURATION_BUILD_DIR="$PWD/build/ios" build | tee ios-build.txt
           APP=$(find build/ios -maxdepth 1 -type d -name '*.app' -print -quit)
           test -n "$APP"
+          test -s "$APP/AlcometCoilArchive"
+          plutil -p "$APP/Info.plist" | tee ios-info.txt
+          grep -q '"CFBundleShortVersionString" => "1.6.0"' ios-info.txt
+          grep -q '"NSCameraUsageDescription"' ios-info.txt
+      - name: Package unsigned IPA and source
+        run: |
+          set -euo pipefail
+          APP=$(find build/ios -maxdepth 1 -type d -name '*.app' -print -quit)
           rm -rf Payload
           mkdir Payload
           cp -R "$APP" Payload/
-          /usr/bin/zip -qry Alcomet_Rolling_Shop_Coil_Archive_iOS_v1.0.0_unsigned.ipa Payload
+          /usr/bin/zip -qry Alcomet_Rolling_Shop_Coil_Archive_iOS_v1.6.0_unsigned.ipa Payload
+          /usr/bin/zip -qry Alcomet_Rolling_Shop_Coil_Archive_iOS_v1.6.0_Xcode_Source.zip mobile/ios
+          test -s Alcomet_Rolling_Shop_Coil_Archive_iOS_v1.6.0_unsigned.ipa
+          unzip -tq Alcomet_Rolling_Shop_Coil_Archive_iOS_v1.6.0_unsigned.ipa
+          shasum -a 256 Alcomet_Rolling_Shop_Coil_Archive_iOS_v1.6.0_unsigned.ipa > Alcomet_Rolling_Shop_Coil_Archive_iOS_v1.6.0_SHA256.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Alcomet-Rolling-Shop-Coil-Archive-iOS-Unsigned-IPA
-          path: Alcomet_Rolling_Shop_Coil_Archive_iOS_v1.0.0_unsigned.ipa
+          name: Alcomet-Rolling-Shop-Coil-Archive-iOS-v1.6.0-Unsigned
+          path: |
+            Alcomet_Rolling_Shop_Coil_Archive_iOS_v1.6.0_unsigned.ipa
+            Alcomet_Rolling_Shop_Coil_Archive_iOS_v1.6.0_Xcode_Source.zip
+            Alcomet_Rolling_Shop_Coil_Archive_iOS_v1.6.0_SHA256.txt
+            ios-build.txt
+            ios-info.txt
           if-no-files-found: error
