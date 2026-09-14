@@ -88,7 +88,7 @@ public class SafeMobileActivity extends MobileActivity {
             root.addView(basic,bp);
 
             TextView version = new TextView(this);
-            version.setText("Android production recovery • v1.3.1");
+            version.setText("Android production recovery • v1.4.0");
             version.setTextColor(Color.rgb(90,117,136));
             version.setTextSize(10);
             version.setGravity(Gravity.CENTER);
